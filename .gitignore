@@ -1,0 +1,17 @@
+# AI UGC Video Generator SaaS
+
+node_modules/
+.next/
+out/
+*.log
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.pem
+.vercel
+dist/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts

@@ -1,368 +1,372 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Video, Loader2, Sparkles, Wand2, Clock, Users, MessageSquare, Target, CreditCard } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import toast from 'react-hot-toast'
 import Link from 'next/link'
 
-const ANGLES = [
-  { value: 'testimonial', label: 'Testimonial', desc: 'Person raving about product' },
-  { value: 'problem-solution', label: 'Problem-Solution', desc: '"Tired of X? This fixed it."' },
-  { value: 'authority', label: 'Doctor/Expert', desc: 'Authority figure recommends' },
-  { value: 'storytime', label: 'Storytime', desc: '"The craziest thing happened..."' },
-  { value: 'street-interview', label: 'Street Interview', desc: 'Two people, vox pop style' },
-  { value: 'unboxing', label: 'Unboxing / GRWM', desc: 'First impression energy' },
-  { value: 'before-after', label: 'Before & After', desc: 'Visual transformation' },
+interface UgcFormProps {
+  credits: number
+  plan: string
+}
+
+const VIDEO_STYLES = [
+  { id: 'testimonial', name: 'Testimonial', description: 'Customer review style' },
+  { id: 'product_review', name: 'Product Review', description: 'In-depth product showcase' },
+  { id: 'unboxing', name: 'Unboxing', description: 'First impressions reveal' },
+  { id: 'how_to', name: 'How-To/Tutorial', description: 'Educational content' },
+  { id: 'day_in_life', name: 'Day in Life', description: 'Lifestyle integration' },
+  { id: 'before_after', name: 'Before & After', description: 'Transformation story' },
 ]
 
-const SETTINGS = [
-  { value: 'bedroom', label: 'Bedroom', emoji: '🛏️' },
-  { value: 'kitchen', label: 'Kitchen', emoji: '🍳' },
-  { value: 'bathroom', label: 'Bathroom', emoji: '🪞' },
-  { value: 'car', label: 'Car', emoji: '🚗' },
-  { value: 'street', label: 'Street', emoji: '🏙️' },
-  { value: 'doctors-office', label: "Doctor's Office", emoji: '🩺' },
-  { value: 'living-room', label: 'Living Room', emoji: '🛋️' },
-  { value: 'gym', label: 'Gym', emoji: '💪' },
-  { value: 'office', label: 'Office', emoji: '💼' },
-]
-
-const GENDERS = [
-  { value: 'female', label: 'Female' },
-  { value: 'male', label: 'Male' },
-]
-
-const ETHNICITIES = [
-  { value: 'Caucasian', label: 'Caucasian' },
-  { value: 'African American', label: 'African American' },
-  { value: 'Hispanic', label: 'Hispanic' },
-  { value: 'East Asian', label: 'East Asian' },
-  { value: 'South Asian', label: 'South Asian' },
-  { value: 'Middle Eastern', label: 'Middle Eastern' },
+const TONES = [
+  { id: 'enthusiastic', name: 'Enthusiastic', description: 'High energy, excited' },
+  { id: 'casual', name: 'Casual', description: 'Relaxed, conversational' },
+  { id: 'professional', name: 'Professional', description: 'Polished, authoritative' },
+  { id: 'humorous', name: 'Humorous', description: 'Funny, entertaining' },
+  { id: 'inspirational', name: 'Inspirational', description: 'Motivational, uplifting' },
 ]
 
 const DURATIONS = [
-  { value: '5', label: '5s', desc: 'Quick hook' },
-  { value: '10', label: '10s', desc: 'Sweet spot' },
-  { value: '15', label: '15s', desc: 'Full pitch' },
+  { value: 15, label: '15 sec', description: 'Short & punchy' },
+  { value: 30, label: '30 sec', description: 'Standard ad' },
+  { value: 60, label: '60 sec', description: 'Detailed review' },
 ]
 
-const AGES = ['20', '25', '28', '32', '35', '40', '45', '50', '55', '60']
-
-export default function UGCForm() {
-  const [step, setStep] = useState<'form' | 'generating' | 'result' | 'error'>('form')
-  const [elapsed, setElapsed] = useState(0)
-  const [result, setResult] = useState<any>(null)
-  const [error, setError] = useState('')
-
-  const [form, setForm] = useState({
-    product_name: '',
-    product_description: '',
-    target_audience: '',
-    key_benefit: '',
-    ugc_angle: 'testimonial',
-    character_gender: 'female',
-    character_age: '28',
-    character_ethnicity: 'Caucasian',
-    setting: 'bedroom',
-    duration: '10',
-    model: 'sora-2-pro-text-to-video',
-    size: 'standard',
+export function UgcForm({ credits, plan }: UgcFormProps) {
+  const router = useRouter()
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [step, setStep] = useState(1)
+  
+  const [formData, setFormData] = useState({
+    productName: '',
+    productDescription: '',
+    keyFeatures: '',
+    targetAudience: '',
+    painPoints: '',
+    videoStyle: 'testimonial',
+    duration: 30,
+    tone: 'enthusiastic',
   })
 
-  const update = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }))
+  const hasEnoughCredits = plan === 'unlimited' || credits > 0
 
-  const generate = async () => {
-    if (!form.product_name.trim() || !form.key_benefit.trim()) {
-      setError('Product name and key benefit are required.')
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!hasEnoughCredits) {
+      toast.error('Insufficient credits. Please upgrade your plan.')
       return
     }
-    setError('')
-    setStep('generating')
-    
-    const timer = setInterval(() => setElapsed((e) => e + 1), 1000)
+
+    setIsGenerating(true)
 
     try {
-      const res = await fetch('/api/generate', {
+      const prompt = buildPrompt(formData)
+      
+      const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          prompt,
+          productName: formData.productName,
+          targetAudience: formData.targetAudience,
+          videoStyle: formData.videoStyle,
+          duration: formData.duration,
+          tone: formData.tone,
+        }),
       })
-      const data = await res.json()
-      clearInterval(timer)
 
-      if (data.status === 'SUCCESS' && data.video_url) {
-        setResult(data)
-        setStep('result')
-      } else {
-        setError(data.message || 'Video generation failed.')
-        setStep('error')
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (data.code === 'NO_CREDITS') {
+          toast.error('Insufficient credits. Please upgrade your plan.')
+        } else {
+          throw new Error(data.error || 'Failed to generate video')
+        }
+        return
       }
-    } catch (err: any) {
-      clearInterval(timer)
-      setError('Connection error: ' + err.message)
-      setStep('error')
+
+      toast.success('Video generation started! Check your history.')
+      router.push('/dashboard/history')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to generate video')
+    } finally {
+      setIsGenerating(false)
     }
   }
 
-  const reset = () => {
-    setStep('form')
-    setResult(null)
-    setError('')
-    setElapsed(0)
-  }
+  const buildPrompt = (data: typeof formData) => {
+    return `Create a ${data.tone} ${data.videoStyle.replace('_', ' ')} video for "${data.productName}".
 
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
+Product Description: ${data.productDescription}
 
-  if (step === 'generating') {
-    const messages = [
-      'Writing your video script with Claude...',
-      'Crafting 5 scroll-stopping hooks...',
-      'Building the perfect UGC prompt...',
-      'Submitting to Sora 2 Pro...',
-      'Rendering your video...',
-      'Almost there — adding final touches...',
-    ]
-    const msgIdx = Math.min(Math.floor(elapsed / 30), messages.length - 1)
+Key Features to Highlight: ${data.keyFeatures}
 
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="w-20 h-20 mx-auto mb-8 rounded-full border-3 border-indigo-500/30 border-t-indigo-500 animate-spin" />
-          <h2 className="text-2xl font-semibold mb-2">Generating Your Video</h2>
-          <p className="text-white/50 mb-6">{messages[msgIdx]}</p>
-          <div className="inline-block bg-indigo-500/15 rounded-xl px-6 py-3">
-            <span className="text-indigo-400 text-3xl font-bold tabular-nums">{formatTime(elapsed)}</span>
-          </div>
-          <p className="text-white/30 text-sm mt-4">Sora 2 Pro typically takes 3–7 minutes</p>
-        </div>
-      </div>
-    )
-  }
+Target Audience: ${data.targetAudience}
 
-  if (step === 'result' && result) {
-    return (
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🎬</div>
-          <h2 className="text-3xl font-bold mb-2">Your Video is Ready</h2>
-          <p className="text-white/50">Generated in {formatTime(elapsed)} • {form.ugc_angle} • {form.duration}s</p>
-        </div>
+Pain Points Addressed: ${data.painPoints}
 
-        <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden mb-6">
-          <video src={result.video_url} controls className="w-full" />
-        </div>
+Video Duration: ${data.duration} seconds
 
-        <a
-          href={result.video_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-center bg-indigo-500 hover:bg-indigo-600 text-white py-4 rounded-xl font-semibold mb-6 transition"
-        >
-          ↓ Download Video
-        </a>
-
-        {result.hook_variations?.length > 0 && (
-          <div className="bg-white/5 rounded-2xl border border-white/10 p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4">🪝 Hook Variations to Test</h3>
-            {result.hook_variations.map((hook: string, i: number) => (
-              <div key={i} className="bg-indigo-500/10 rounded-lg p-3 mb-3 flex items-center gap-3">
-                <span className="text-indigo-400 font-bold min-w-[24px]">{i + 1}</span>
-                <span className="text-white/85">{hook}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button
-          onClick={reset}
-          className="w-full py-4 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-semibold transition"
-        >
-          ← Generate Another Video
-        </button>
-      </div>
-    )
-  }
-
-  if (step === 'error') {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-semibold mb-3">Generation Failed</h2>
-          <p className="text-white/50 mb-6">{error}</p>
-          <button
-            onClick={reset}
-            className="px-8 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 font-semibold transition"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    )
+Style: Authentic user-generated content, natural lighting, casual setting, genuine enthusiasm.`
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-white/5 rounded-2xl border border-white/10 p-6 mb-4">
-        <h3 className="text-lg font-semibold mb-4">📦 Product</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="text-white/70 text-sm font-medium block mb-2">Product Name *</label>
-            <input
-              type="text"
-              placeholder="e.g. Sleep Gummies, ProstaMax Plus"
-              value={form.product_name}
-              onChange={(e) => update('product_name', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="text-white/70 text-sm font-medium block mb-2">Key Benefit *</label>
-            <input
-              type="text"
-              placeholder="The ONE thing this product does"
-              value={form.key_benefit}
-              onChange={(e) => update('key_benefit', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="text-white/70 text-sm font-medium block mb-2">Product Description</label>
-            <textarea
-              placeholder="More details about the product..."
-              value={form.product_description}
-              onChange={(e) => update('product_description', e.target.value)}
-              rows={3}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:border-indigo-500 resize-y"
-            />
-          </div>
-          <div>
-            <label className="text-white/70 text-sm font-medium block mb-2">Target Audience</label>
-            <input
-              type="text"
-              placeholder="Who buys this?"
-              value={form.target_audience}
-              onChange={(e) => update('target_audience', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-        </div>
+    <div className="rounded-2xl border border-border bg-card p-6">
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <Wand2 className="h-5 w-5 text-primary" />
+          Create New Video
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Fill in the details below to generate your AI UGC video
+        </p>
       </div>
 
-      <div className="bg-white/5 rounded-2xl border border-white/10 p-6 mb-4">
-        <h3 className="text-lg font-semibold mb-4">🎭 Creative</h3>
-        <div className="mb-4">
-          <label className="text-white/70 text-sm font-medium block mb-2">UGC Angle</label>
-          <div className="grid grid-cols-2 gap-2">
-            {ANGLES.map((a) => (
-              <button
-                key={a.value}
-                onClick={() => update('ugc_angle', a.value)}
-                className={`p-3 rounded-xl text-left border transition ${
-                  form.ugc_angle === a.value
-                    ? 'border-indigo-500 bg-indigo-500/15 text-white'
-                    : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10'
-                }`}
-              >
-                <div className="font-semibold text-sm">{a.label}</div>
-                <div className="text-xs opacity-60 mt-1">{a.desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mb-4">
-          <label className="text-white/70 text-sm font-medium block mb-2">Setting</label>
-          <div className="flex flex-wrap gap-2">
-            {SETTINGS.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => update('setting', s.value)}
-                className={`px-4 py-2 rounded-full border transition ${
-                  form.setting === s.value
-                    ? 'border-indigo-500 bg-indigo-500/15 text-white'
-                    : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10'
-                }`}
-              >
-                {s.emoji} {s.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="text-white/70 text-sm font-medium block mb-2">Duration</label>
-          <div className="flex gap-2">
-            {DURATIONS.map((d) => (
-              <button
-                key={d.value}
-                onClick={() => update('duration', d.value)}
-                className={`flex-1 p-3 rounded-xl border transition ${
-                  form.duration === d.value
-                    ? 'border-indigo-500 bg-indigo-500/15 text-white'
-                    : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10'
-                }`}
-              >
-                <div className="font-bold">{d.label}</div>
-                <div className="text-xs opacity-60 mt-1">{d.desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Progress Steps */}
+      <div className="flex items-center gap-2 mb-8">
+        {[1, 2, 3].map((s) => (
+          <div
+            key={s}
+            className={cn(
+              'flex-1 h-2 rounded-full transition-colors',
+              s <= step ? 'bg-primary' : 'bg-muted'
+            )}
+          />
+        ))}
       </div>
 
-      <div className="bg-white/5 rounded-2xl border border-white/10 p-6 mb-4">
-        <h3 className="text-lg font-semibold mb-4">👤 Character</h3>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="text-white/70 text-sm font-medium block mb-2">Gender</label>
-            <select
-              value={form.character_gender}
-              onChange={(e) => update('character_gender', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:border-indigo-500"
-            >
-              {GENDERS.map((g) => (
-                <option key={g.value} value={g.value}>{g.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-white/70 text-sm font-medium block mb-2">Age</label>
-            <select
-              value={form.character_age}
-              onChange={(e) => update('character_age', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:border-indigo-500"
-            >
-              {AGES.map((a) => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-white/70 text-sm font-medium block mb-2">Ethnicity</label>
-            <select
-              value={form.character_ethnicity}
-              onChange={(e) => update('character_ethnicity', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:border-indigo-500"
-            >
-              {ETHNICITIES.map((e) => (
-                <option key={e.value} value={e.value}>{e.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+      <form onSubmit={handleSubmit}>
+        {step === 1 && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Product/Service Name *
+              </label>
+              <input
+                type="text"
+                value={formData.productName}
+                onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                placeholder="e.g., GlowSkin Serum"
+                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary"
+                required
+              />
+            </div>
 
-      {error && (
-        <div className="bg-red-500/15 border border-red-500/30 rounded-xl p-4 mb-4 text-red-300 text-sm">
-          {error}
-        </div>
-      )}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Product Description *
+              </label>
+              <textarea
+                value={formData.productDescription}
+                onChange={(e) => setFormData({ ...formData, productDescription: e.target.value })}
+                placeholder="Describe what your product does and its main benefits..."
+                rows={3}
+                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary resize-none"
+                required
+              />
+            </div>
 
-      <button
-        onClick={generate}
-        className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-bold text-lg shadow-lg shadow-indigo-500/30 transition"
-      >
-        🎬 Generate UGC Video
-      </button>
-      <p className="text-center text-white/30 text-sm mt-3">Takes 3–7 minutes • Powered by Claude + Sora 2 Pro</p>
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Key Features (comma separated)
+              </label>
+              <input
+                type="text"
+                value={formData.keyFeatures}
+                onChange={(e) => setFormData({ ...formData, keyFeatures: e.target.value })}
+                placeholder="e.g., Organic ingredients, Fast absorption, Cruelty-free"
+                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              disabled={!formData.productName || !formData.productDescription}
+              className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Target Audience *
+              </label>
+              <input
+                type="text"
+                value={formData.targetAudience}
+                onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
+                placeholder="e.g., Women 25-40 interested in skincare"
+                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Pain Points Addressed
+              </label>
+              <textarea
+                value={formData.painPoints}
+                onChange={(e) => setFormData({ ...formData, painPoints: e.target.value })}
+                placeholder="What problems does your product solve for customers?"
+                rows={2}
+                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary resize-none"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex-1 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                disabled={!formData.targetAudience}
+                className="flex-1 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            {/* Video Style */}
+            <div>
+              <label className="block text-sm font-medium mb-3">
+                Video Style *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {VIDEO_STYLES.map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, videoStyle: style.id })}
+                    className={cn(
+                      'p-3 rounded-lg border text-left transition-all',
+                      formData.videoStyle === style.id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    <div className="font-medium text-sm">{style.name}</div>
+                    <div className="text-xs text-muted-foreground">{style.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div>
+              <label className="block text-sm font-medium mb-3">
+                Video Duration *
+              </label>
+              <div className="flex gap-2">
+                {DURATIONS.map((duration) => (
+                  <button
+                    key={duration.value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, duration: duration.value })}
+                    className={cn(
+                      'flex-1 p-3 rounded-lg border text-center transition-all',
+                      formData.duration === duration.value
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    <div className="font-medium text-sm">{duration.label}</div>
+                    <div className="text-xs text-muted-foreground">{duration.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tone */}
+            <div>
+              <label className="block text-sm font-medium mb-3">
+                Video Tone *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {TONES.map((tone) => (
+                  <button
+                    key={tone.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, tone: tone.id })}
+                    className={cn(
+                      'p-3 rounded-lg border text-left transition-all',
+                      formData.tone === tone.id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    <div className="font-medium text-sm">{tone.name}</div>
+                    <div className="text-xs text-muted-foreground">{tone.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {!hasEnoughCredits && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4">
+                <div className="flex items-start gap-3">
+                  <CreditCard className="h-5 w-5 text-destructive mt-0.5" />
+                  <div>
+                    <p className="font-medium text-destructive">Insufficient Credits</p>
+                    <p className="text-sm text-destructive/80">
+                      You need credits to generate videos.{' '}
+                      <Link href="/pricing" className="underline">
+                        Upgrade your plan
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="flex-1 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isGenerating || !hasEnoughCredits}
+                className="flex-1 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Generate Video
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </form>
     </div>
   )
 }
