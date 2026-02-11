@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { PricingCard } from '@/components/pricing-card'
 import { PLANS } from '@/lib/subscriptions'
 

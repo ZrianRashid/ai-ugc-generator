@@ -24,7 +24,9 @@
     "postcss": "^8.4.33",
     "clsx": "^2.1.0",
     "lucide-react": "^0.312.0",
-    "class-variance-authority": "^0.7.0"
+    "class-variance-authority": "^0.7.0",
+    "tailwind-merge": "^2.2.0",
+    "react-hot-toast": "^2.4.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

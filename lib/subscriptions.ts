@@ -2,6 +2,20 @@ import { createClientClient } from './supabase'
 
 export type PlanType = 'starter' | 'pro' | 'unlimited' | 'payg'
 
+export interface Plan {
+  id: PlanType
+  name: string
+  description: string
+  price: number
+  priceId: string | null | undefined
+  features: string[]
+  limits: {
+    videosPerMonth: number
+    quality: string
+    watermark: boolean
+  }
+}
+
 export interface Subscription {
   id: string
   user_id: string
@@ -11,7 +25,7 @@ export interface Subscription {
   cancel_at_period_end: boolean
 }
 
-export const PLANS = {
+export const PLANS: Record<PlanType, Plan> = {
   starter: {
     id: 'starter',
     name: 'Starter',
